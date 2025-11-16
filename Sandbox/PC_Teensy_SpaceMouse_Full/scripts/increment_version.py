@@ -1,3 +1,5 @@
+# Script to automatically increment the build version for every build
+
 # type: ignore
 import json
 import os

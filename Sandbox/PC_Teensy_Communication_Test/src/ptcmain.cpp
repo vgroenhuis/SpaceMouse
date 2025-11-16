@@ -1,3 +1,7 @@
+/*
+    PC to Teensy 4.1 communication test script
+*/
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>

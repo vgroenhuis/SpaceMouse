@@ -20,3 +20,13 @@ The protocol uses JSON messages, intertwined with human-readable messages.
 - Click "Get Status" to get some dummy status information
 - Click "Load Settings" to retrieve some settings.
 - Change settings (max speed, invert joystick, mode etc), click "Set Values" and then "Save Settings". Unplug Teensy 4.1 (shutting it of), plug Teensy back in, connect again and confirm that changed settings are correctly saved.
+
+## Troubleshooting
+
+### Python executable cannot be found
+Ctrl-shift-P and choose Python environment, optionally create virtual environment (venv)
+
+### No module named 'serial'
+Run following commands in terminal / Powershell:
+- pip install pyserial
+- pip install pyqt6
