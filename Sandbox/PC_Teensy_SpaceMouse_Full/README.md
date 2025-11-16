@@ -4,13 +4,22 @@ A script for Teensy 4.1 to communicate with SpaceMouse and USB serial devices, w
 
 ## Manual
 
-TODO
+1. Connect Mamri and Spacemouse through USB hub to Teensy. Keep Mamri off for now.
+2. Power Teensy using powerbank. The Teensy LED should blink at 1 Hz with 40% duty cycle.
+3. Power Mamri. The Teensy LED should blink at 2 Hz with 90% duty cycle.
 
 ## Onboard LED
 
-10 Hz, 50%: waiting for host serial to start (debugging only)
+- 1 Hz, 5%: nothing connected
+- 1 Hz, 25%: only usbserial connected
+- 1 Hz, 40%: only SpaceMouse connected
+- 2 Hz, 90%: both SpaceMouse and usbserial connected
 
 ## Troubleshooting
+
+### Teensy LED does not blink
+Program has crashed. Happens a lot when plugging/unplugging serial. Turn off the Teensy and redo the steps in manual.
+
 ### Message "JoystickController claim collection" in serial
 Find the line with this message in `.platformio\packages\framework-arduinoteensy\libraries\USBHost_t36\joystick.cpp` and comment it out.
 

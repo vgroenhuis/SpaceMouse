@@ -69,6 +69,7 @@ def generate_spacemouse_pixmap(size: int = 64) -> QPixmap:
 class SerialReader(QThread):
     received_json = pyqtSignal(dict)
     received_text = pyqtSignal(str)
+    connection_lost = pyqtSignal(str)  # emits error message when underlying serial disconnects
 
     def __init__(self, ser):
         super().__init__()
@@ -91,7 +92,8 @@ class SerialReader(QThread):
                     self.received_text.emit(line)
 
             except Exception as e:
-                self.received_text.emit(f"[ERROR] Reader exception: {e}")
+                # Notify main window; include error text
+                self.connection_lost.emit(str(e))
                 break
 
     def stop(self):
@@ -101,6 +103,27 @@ class SerialReader(QThread):
 
 # --------------------------- Main GUI --------------------------------
 
+class ElideLabel(QLabel):
+    """QLabel that automatically elides text when space is constrained."""
+    def __init__(self, text: str = "", parent=None, mode: Qt.TextElideMode = Qt.TextElideMode.ElideRight):
+        super().__init__(text, parent)
+        self._full_text = text
+        self._elide_mode = mode
+
+    def setText(self, text: str):
+        self._full_text = str(text)
+        self._update_elide()
+
+    def resizeEvent(self, event):
+        self._update_elide()
+        return super().resizeEvent(event)
+
+    def _update_elide(self):
+        fm = self.fontMetrics()
+        width = max(1, self.width())
+        elided = fm.elidedText(self._full_text, self._elide_mode, width)
+        super().setText(elided)
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -108,6 +131,7 @@ class MainWindow(QWidget):
         self.ser = None
         self.reader_thread = None
         self.show_json = True
+        self.show_position_updates = False  # Default: hide position updates
         
         self.fw_version = "Unknown"
 
@@ -154,15 +178,21 @@ class MainWindow(QWidget):
         # --------------------------------------------------------------
         # Device Status Display
         # --------------------------------------------------------------
-        status_group = QGroupBox("Device Status")
+        status_group = QGroupBox("Teensy Status")
         status_layout = QGridLayout()
         
-        # Firmware + SpaceMouse status
+        # Firmware + SpaceMouse + USB Serial + Teensy connection status
         self.fw_label = QLabel("Firmware: Unknown")
         self.spacemouse_status_label = QLabel("SpaceMouse: Disconnected")
         self.spacemouse_status_label.setStyleSheet("color: red; font-weight: bold;")
+        self.usbserial_status_label = QLabel("USB Serial: Disconnected")
+        self.usbserial_status_label.setStyleSheet("color: red; font-weight: bold;")
+        self.teensy_status_label = QLabel("Teensy: Disconnected")
+        self.teensy_status_label.setStyleSheet("color: red; font-weight: bold;")
         status_layout.addWidget(self.fw_label, 0, 0, 1, 2)
-        status_layout.addWidget(self.spacemouse_status_label, 0, 2, 1, 2)
+        status_layout.addWidget(self.teensy_status_label, 0, 2, 1, 2)
+        status_layout.addWidget(self.spacemouse_status_label, 0, 4, 1, 2)
+        status_layout.addWidget(self.usbserial_status_label, 0, 6, 1, 2)
         
         status_group.setLayout(status_layout)
         main_layout.addWidget(status_group)
@@ -174,32 +204,29 @@ class MainWindow(QWidget):
         sm_layout = QHBoxLayout()
         # Single-line compact aggregated labels
         xyz_text_label = QLabel("X Y Z:")
-        self.xyz_label = QLabel("[0, 0, 0]")
+        self.xyz_label = ElideLabel("[0, 0, 0]")
         self.xyz_label.setStyleSheet("font-family: Consolas;")
-        # Fix width to prevent shifting of subsequent groups when values grow
-        fm_xyz = QFontMetrics(self.xyz_label.font())
-        xyz_template = "[-32768, -32768, -32768]"  # Worst-case width template
-        self.xyz_label.setFixedWidth(fm_xyz.horizontalAdvance(xyz_template) + 8)
         rxyz_text_label = QLabel("  RX RY RZ:")
-        self.rxyz_label = QLabel("[0, 0, 0]")
+        self.rxyz_label = ElideLabel("[0, 0, 0]")
         self.rxyz_label.setStyleSheet("font-family: Consolas;")
-        fm_rxyz = QFontMetrics(self.rxyz_label.font())
-        rxyz_template = "[-32768, -32768, -32768]"
-        self.rxyz_label.setFixedWidth(fm_rxyz.horizontalAdvance(rxyz_template) + 8)
         btn_text_label = QLabel("  Buttons:")
-        self.btn_label = QLabel("")
+        self.btn_label = ElideLabel("NONE")
         self.btn_label.setStyleSheet("font-family: Consolas;")
-        fm_btn = QFontMetrics(self.btn_label.font())
-        btn_template = "LEFT+RIGHT"  # Longest expected buttons text (10 chars)
-        self.btn_label.setFixedWidth(fm_btn.horizontalAdvance(btn_template) + 8)
-        # Dominant axis/direction label
         dominant_text_label = QLabel("  Dominant:")
-        self.dominant_label = QLabel("NONE")
+        self.dominant_label = ElideLabel("NONE ")
         self.dominant_label.setStyleSheet("font-family: Consolas;")
-        fm_dominant = QFontMetrics(self.dominant_label.font())
-        # Template covers longest expected text: "RX -" (axis + space + sign)
-        dominant_template = "RX -"
-        self.dominant_label.setFixedWidth(fm_dominant.horizontalAdvance(dominant_template) + 8)
+        # Provide sensible minimum widths to avoid hiding typical content
+        # while still allowing eliding when extremely narrow.
+        fm = QFontMetrics(self.xyz_label.font())
+        xyz_template = "[-100, -100, -100]"
+        rxyz_template = "[-100, -100, -100]"
+        btn_template = "LEFT+RIGHT"
+        dominant_template = "NONE"
+        pad = 10  # small padding for readability
+        self.xyz_label.setMinimumWidth(fm.horizontalAdvance(xyz_template) + pad)
+        self.rxyz_label.setMinimumWidth(fm.horizontalAdvance(rxyz_template) + pad)
+        self.btn_label.setMinimumWidth(fm.horizontalAdvance(btn_template) + pad)
+        self.dominant_label.setMinimumWidth(fm.horizontalAdvance(dominant_template) + pad)
         sm_layout.addWidget(xyz_text_label)
         sm_layout.addWidget(self.xyz_label)
         sm_layout.addWidget(rxyz_text_label)
@@ -211,6 +238,32 @@ class MainWindow(QWidget):
         sm_layout.addStretch(1)
         sm_group.setLayout(sm_layout)
         main_layout.addWidget(sm_group)
+
+        # --------------------------------------------------------------
+        # Robot Data (moved from SpaceMouse Data)
+        # --------------------------------------------------------------
+        robot_group = QGroupBox("Robot Data")
+        robot_layout = QHBoxLayout()
+        joints_text_label = QLabel("Current:")
+        self.robot_joints_label = ElideLabel("[0, 0, 0, 0, 0, 0, 0, 0]")
+        self.robot_joints_label.setStyleSheet("font-family: Consolas;")
+        # Set minimum width for large joint values (e.g., 100000)
+        fm = QFontMetrics(self.robot_joints_label.font())
+        joints_template = "[100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000]"
+        self.robot_joints_label.setMinimumWidth(fm.horizontalAdvance(joints_template) + 12)
+        robot_layout.addWidget(joints_text_label)
+        robot_layout.addWidget(self.robot_joints_label)
+        # Add setpoint display
+        setpoint_text_label = QLabel("  Setpoint:")
+        self.robot_setpoint_label = ElideLabel("[0, 0, 0, 0, 0, 0, 0, 0]")
+        self.robot_setpoint_label.setStyleSheet("font-family: Consolas;")
+        # Set minimum width for large setpoint values
+        self.robot_setpoint_label.setMinimumWidth(fm.horizontalAdvance(joints_template) + 12)
+        robot_layout.addWidget(setpoint_text_label)
+        robot_layout.addWidget(self.robot_setpoint_label)
+        robot_layout.addStretch(1)
+        robot_group.setLayout(robot_layout)
+        main_layout.addWidget(robot_group)
 
         # --------------------------------------------------------------
         # Logs Section
@@ -249,9 +302,16 @@ class MainWindow(QWidget):
         
         clear_teensy_btn = QPushButton("Clear")
         clear_teensy_btn.clicked.connect(lambda: self.teensy_serial_log.clear())
+        self.show_position_chk = QCheckBox("Show position updates")
+        self.show_position_chk.setChecked(False)
+        self.show_position_chk.toggled.connect(lambda v: setattr(self, "show_position_updates", v))
         
         teensy_serial_layout.addWidget(self.teensy_serial_log)
-        teensy_serial_layout.addWidget(clear_teensy_btn)
+        teensy_controls_row = QHBoxLayout()
+        teensy_controls_row.addWidget(self.show_position_chk)
+        teensy_controls_row.addStretch(1)
+        teensy_controls_row.addWidget(clear_teensy_btn)
+        teensy_serial_layout.addLayout(teensy_controls_row)
         teensy_serial_group.setLayout(teensy_serial_layout)
         
         logs_layout.addWidget(pc_teensy_group)
@@ -292,23 +352,28 @@ class MainWindow(QWidget):
     def connect_serial(self):
         port = self.port_combo.currentData()
         if not port:
-            self.log_pc_teensy("[ERROR] No port selected")
+            self.log_pc_teensy("[ERROR] No port selected", is_system=True)
             return
 
         try:
             self.ser = serial.Serial(port, 115200, timeout=0.1)
-            self.log_pc_teensy(f"[PC] Connected to {port}")
+            self.log_pc_teensy(f"[PC] Connected to {port}", is_system=True)
 
             self.reader_thread = SerialReader(self.ser)
             self.reader_thread.received_text.connect(self.handle_text)
             self.reader_thread.received_json.connect(self.handle_json)
+            self.reader_thread.connection_lost.connect(self.handle_connection_lost)
             self.reader_thread.start()
+
+            # Teensy successfully opened
+            self.teensy_status_label.setText("Teensy: Connected")
+            self.teensy_status_label.setStyleSheet("color: green; font-weight: bold;")
 
             self.connect_btn.setEnabled(False)
             self.disconnect_btn.setEnabled(True)
 
         except Exception as e:
-            self.log_pc_teensy(f"[ERROR] Connection failed: {e}")
+            self.log_pc_teensy(f"[ERROR] Connection failed: {e}", is_system=True)
 
     def disconnect_serial(self):
         if self.reader_thread:
@@ -320,55 +385,153 @@ class MainWindow(QWidget):
             except:
                 pass
 
-        self.log_pc_teensy("[PC] Disconnected")
+        self.log_pc_teensy("[PC] Disconnected", is_system=True)
+        # Teensy gone implies SpaceMouse and USB Serial are also disconnected
+        self.teensy_status_label.setText("Teensy: Disconnected")
+        self.teensy_status_label.setStyleSheet("color: red; font-weight: bold;")
+        self.spacemouse_status_label.setText("SpaceMouse: Disconnected")
+        self.spacemouse_status_label.setStyleSheet("color: red; font-weight: bold;")
+        self.usbserial_status_label.setText("USB Serial: Disconnected")
+        self.usbserial_status_label.setStyleSheet("color: red; font-weight: bold;")
 
         self.connect_btn.setEnabled(True)
         self.disconnect_btn.setEnabled(False)
 
     # ------------------------ Logging ------------------------
 
-    def log_pc_teensy(self, msg, from_teensy=False, is_json=False):
-        """Log PC-Teensy JSON communication"""
+    def log_pc_teensy(self, msg, from_teensy=False, is_json=False, is_system=False):
+        """Log PC-Teensy JSON communication
+        
+        Args:
+            msg: Message text
+            from_teensy: True if message is from Teensy (grey background, left-aligned)
+            is_json: True if JSON message
+            is_system: True for system status messages (white background, italic, left-aligned)
+        """
         if is_json and not self.show_json:
             return
-        if from_teensy:
-            # Add light grey background for messages from Teensy
-            cursor = self.pc_teensy_log.textCursor()
-            cursor.movePosition(cursor.MoveOperation.End)
+        
+        cursor = self.pc_teensy_log.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        
+        # Add newline before if there's existing content
+        if not self.pc_teensy_log.document().isEmpty():
+            cursor.insertText('\n')
+        
+        # Create block format for alignment
+        block_fmt = cursor.blockFormat()
+        fmt = cursor.charFormat()
+        
+        if is_system:
+            # System status messages: white background, italic, left-aligned
+            block_fmt.setAlignment(Qt.AlignmentFlag.AlignLeft)
+            cursor.setBlockFormat(block_fmt)
             
-            # Add newline before if there's existing content
-            if not self.pc_teensy_log.document().isEmpty():
-                cursor.insertText('\n')
+            fmt.setBackground(Qt.GlobalColor.white)
+            fmt.setForeground(QColor(0, 0, 0))
+            fmt.setFontItalic(True)
+            cursor.setCharFormat(fmt)
+            cursor.insertText(msg)
+        elif from_teensy:
+            # Messages from Teensy: light grey background, left-aligned, NOT italic
+            block_fmt.setAlignment(Qt.AlignmentFlag.AlignLeft)
+            cursor.setBlockFormat(block_fmt)
             
-            # Insert with background color and optional blue text for JSON
-            fmt = cursor.charFormat()
             fmt.setBackground(QColor(230, 230, 230))  # Very light grey
             if is_json:
                 fmt.setForeground(QColor(0, 0, 255))  # Blue for JSON
             else:
                 fmt.setForeground(QColor(0, 0, 0))  # Black for other text
+            fmt.setFontItalic(False)  # Explicitly set to not italic
             cursor.setCharFormat(fmt)
             cursor.insertText(msg)
-            
-            # Reset format
-            fmt.setBackground(Qt.GlobalColor.white)
-            fmt.setForeground(QColor(0, 0, 0))
-            cursor.setCharFormat(fmt)
-            
-            self.pc_teensy_log.setTextCursor(cursor)
-            self.pc_teensy_log.ensureCursorVisible()
         else:
-            self.pc_teensy_log.append(msg)
+            # Messages to Teensy (outgoing): light green background, right-aligned, NOT italic
+            block_fmt.setAlignment(Qt.AlignmentFlag.AlignRight)
+            cursor.setBlockFormat(block_fmt)
+            
+            fmt.setBackground(QColor(200, 255, 200))  # Light green
+            fmt.setForeground(QColor(0, 0, 0))  # Black text
+            fmt.setFontItalic(False)  # Explicitly set to not italic
+            cursor.setCharFormat(fmt)
+            cursor.insertText(msg)
+        
+        # Reset format
+        fmt = cursor.charFormat()
+        fmt.setBackground(Qt.GlobalColor.white)
+        fmt.setForeground(QColor(0, 0, 0))
+        fmt.setFontItalic(False)
+        cursor.setCharFormat(fmt)
+        
+        self.pc_teensy_log.setTextCursor(cursor)
+        self.pc_teensy_log.ensureCursorVisible()
 
-    def log_teensy_serial(self, msg):
-        """Log Teensy-USB device communication"""
-        self.teensy_serial_log.append(msg)
+    def log_teensy_serial(self, msg, from_device=False, is_json=False):
+        """Log Teensy ↔ USB device communication in the right log.
+        from_device=True styles messages coming from the device (Mamri) with grey background.
+        from_device=False styles outgoing messages (Teensy→Mamri) with green background and right-align.
+        """
+        cursor = self.teensy_serial_log.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        
+        if not self.teensy_serial_log.document().isEmpty():
+            cursor.insertText('\n')
+        
+        # Create block format for alignment
+        block_fmt = cursor.blockFormat()
+        fmt = cursor.charFormat()
+        
+        if from_device:
+            # Messages from device: light grey background, left-aligned
+            block_fmt.setAlignment(Qt.AlignmentFlag.AlignLeft)
+            cursor.setBlockFormat(block_fmt)
+            
+            fmt.setBackground(QColor(230, 230, 230))
+            fmt.setForeground(QColor(0, 0, 0))
+        else:
+            # Outgoing messages (Teensy→device): light green background, right-aligned
+            block_fmt.setAlignment(Qt.AlignmentFlag.AlignRight)
+            cursor.setBlockFormat(block_fmt)
+            
+            fmt.setBackground(QColor(200, 255, 200))  # Light green
+            fmt.setForeground(QColor(0, 0, 0))
+        
+        cursor.setCharFormat(fmt)
+        cursor.insertText(msg)
+        
+        # Reset format
+        fmt.setBackground(Qt.GlobalColor.white)
+        fmt.setForeground(QColor(0, 0, 0))
+        cursor.setCharFormat(fmt)
+        
+        self.teensy_serial_log.setTextCursor(cursor)
+        self.teensy_serial_log.ensureCursorVisible()
 
     # ------------------------ Message Handling ------------------------
 
     def handle_text(self, line):
         """Handle all received text lines"""
         self.log_pc_teensy(f"< {line}", from_teensy=True)
+
+    def handle_connection_lost(self, err):
+        """Handle unexpected Teensy serial disconnect (e.g., cable unplug)."""
+        self.log_pc_teensy(f"[ERROR] Connection lost: {err}", is_system=True)
+        # Update all dependent device statuses
+        self.teensy_status_label.setText("Teensy: Disconnected")
+        self.teensy_status_label.setStyleSheet("color: red; font-weight: bold;")
+        self.spacemouse_status_label.setText("SpaceMouse: Disconnected")
+        self.spacemouse_status_label.setStyleSheet("color: red; font-weight: bold;")
+        self.usbserial_status_label.setText("USB Serial: Disconnected")
+        self.usbserial_status_label.setStyleSheet("color: red; font-weight: bold;")
+        # Clean up serial state
+        try:
+            if self.ser:
+                self.ser.close()
+        except:
+            pass
+        self.ser = None
+        self.connect_btn.setEnabled(True)
+        self.disconnect_btn.setEnabled(False)
 
     def handle_json(self, data):
         """Handle JSON messages"""
@@ -390,6 +553,15 @@ class MainWindow(QWidget):
             else:
                 self.spacemouse_status_label.setText("SpaceMouse: Disconnected")
                 self.spacemouse_status_label.setStyleSheet("color: red; font-weight: bold;")
+        
+        # Handle USB Serial connection status
+        if "usbserial_connected" in data:
+            if data["usbserial_connected"]:
+                self.usbserial_status_label.setText("USB Serial: Connected")
+                self.usbserial_status_label.setStyleSheet("color: green; font-weight: bold;")
+            else:
+                self.usbserial_status_label.setText("USB Serial: Disconnected")
+                self.usbserial_status_label.setStyleSheet("color: red; font-weight: bold;")
 
         # Handle SpaceMouse axes/buttons
         # Preferred: arrays sm_xyz:[x,y,z] and sm_rxyz:[rx,ry,rz]
@@ -420,11 +592,17 @@ class MainWindow(QWidget):
                     rxyz = vals[3:6]
 
         if xyz is not None:
-            self.xyz_label.setText(f"[{xyz[0]}, {xyz[1]}, {xyz[2]}]")
+            xyz_text = f"[{xyz[0]}, {xyz[1]}, {xyz[2]}]"
+            self.xyz_label.setText(xyz_text)
+            self.xyz_label.setToolTip(xyz_text)
         if rxyz is not None:
-            self.rxyz_label.setText(f"[{rxyz[0]}, {rxyz[1]}, {rxyz[2]}]")
+            rxyz_text = f"[{rxyz[0]}, {rxyz[1]}, {rxyz[2]}]"
+            self.rxyz_label.setText(rxyz_text)
+            self.rxyz_label.setToolTip(rxyz_text)
         if "sm_buttons" in data:
-            self.btn_label.setText(self.format_buttons(data["sm_buttons"]))
+            btn_text = self.format_buttons(data["sm_buttons"])
+            self.btn_label.setText(btn_text)
+            self.btn_label.setToolTip(btn_text)
         # Dominant axis/direction (new keys) with legacy fallback
         axis = None
         direction = None
@@ -443,6 +621,49 @@ class MainWindow(QWidget):
                 self.dominant_label.setText("NONE")
             else:
                 self.dominant_label.setText(f"{axis}{sign}")
+        
+        # Robot joints array (8 numbers)
+        if "robot_joints" in data and isinstance(data["robot_joints"], list):
+            rj = data["robot_joints"][:8]
+            vals = []
+            for v in rj:
+                try:
+                    vals.append(str(int(float(v))))
+                except Exception:
+                    vals.append(str(v))
+            joints_text = "[" + ", ".join(vals) + "]"
+            self.robot_joints_label.setText(joints_text)
+            self.robot_joints_label.setToolTip(joints_text)
+
+        # Robot setpoint array (8 numbers)
+        if "robot_setpoint" in data and isinstance(data["robot_setpoint"], list):
+            rs = data["robot_setpoint"][:8]
+            vals = []
+            for v in rs:
+                try:
+                    vals.append(str(int(float(v))))
+                except Exception:
+                    vals.append(str(v))
+            setpoint_text = "[" + ", ".join(vals) + "]"
+            self.robot_setpoint_label.setText(setpoint_text)
+            self.robot_setpoint_label.setToolTip(setpoint_text)
+
+        # Handle USB Serial data - route to right log window
+        if "usbserial_data" in data:
+            serial_data = data.get("usbserial_data", "")
+            if serial_data:
+                # Filter position updates if checkbox is unchecked
+                # Position data looks like comma-separated numbers (8 values)
+                is_position_data = "," in serial_data and all(c.isdigit() or c in ",.- " for c in serial_data.strip())
+                if not is_position_data or self.show_position_updates:
+                    self.log_teensy_serial(serial_data, from_device=True)
+        # Handle USB Serial transmissions (from Teensy to device) for logging
+        if "usbserial_tx" in data:
+            tx = data.get("usbserial_tx", "")
+            if tx:
+                # Filter "P" command if checkbox is unchecked
+                if tx.strip() != "P" or self.show_position_updates:
+                    self.log_teensy_serial(f"> {tx}")
             
 
     def parse_device_status(self, line):
@@ -452,12 +673,12 @@ class MainWindow(QWidget):
     def send_json(self, obj):
         """Send JSON command to Teensy"""
         if not self.ser:
-            self.log_pc_teensy("[ERROR] Not connected")
+            self.log_pc_teensy("[ERROR] Not connected", is_system=True)
             return
 
         msg = json.dumps(obj) + "\n"
         self.ser.write(msg.encode("utf-8"))
-        self.log_pc_teensy(f"> {msg.strip()}", is_json=True)
+        self.log_pc_teensy(f"> {msg.strip()}", from_teensy=False, is_json=True)
 
     # ------------------------ Helpers ------------------------
 

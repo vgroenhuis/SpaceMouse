@@ -8,6 +8,7 @@
 #include "version.h"
 #include "UsbHost.hpp"
 
+
 const bool WAIT_FOR_HOST_SERIAL = false; // set true for debugging, false for production
 
 LittleFS_Program myfs;
@@ -32,12 +33,15 @@ void blinkLed(float freq, float duty) {
 
 void initLittleFS() {
     if (!myfs.begin(1024 * 1024 * 1)) { // 1 MB for filedata
-        Serial.printf("[ERROR] Error starting %s\n", "Program flash DISK");
-        while(1) {
-            blinkLed(1.0f, 0.9f);  // Blink LED at 1Hz with 90% duty cycle
+        // LittleFS failed - log error but continue operation
+        // (allows standalone operation without PC connection)
+        if (Serial) {
+            Serial.printf("[WARNING] LittleFS initialization failed - continuing without filesystem\n");
         }
     } else {
-        Serial.println("[INFO] LittleFS initialized successfully");
+        if (Serial) {
+            Serial.println("[INFO] LittleFS initialized successfully");
+        }
     }
 }
 
@@ -49,6 +53,7 @@ void sendWelcomeInfo() {
     doc["fw_ver"] = FW_VERSION_STRING;
     doc["device"] = "teensy41";
     doc["spacemouse_connected"] = spaceMouseConnected();
+    doc["usbserial_connected"] = usbSerialConnected();
     sendJson(doc);
 }
 
@@ -81,9 +86,13 @@ void loop()
     }
 
     usbHostLoop();
-    if (spaceMouseConnected()) {
-        blinkLed(2.0f, 0.9f); // 90% duty cycle when SpaceMouse is connected
+    if (spaceMouseConnected() && usbSerialConnected()) {
+        blinkLed(2.0f, 0.9f); // 90% duty cycle when SpaceMouse and USB to serial are connected
+    } else if (spaceMouseConnected()) {
+        blinkLed(1.0f, 0.5f); // 70% duty cycle when only SpaceMouse is connected
+    } else if (usbSerialConnected()) {
+        blinkLed(1.0f, 0.25f); // 40% duty cycle when only USB serial is connected
     } else {
-        blinkLed(1.0f, 0.1f); // 10% duty cycle
+        blinkLed(1.0f, 0.05f); // 10% duty cycle if nothing is connected
     }
 }
