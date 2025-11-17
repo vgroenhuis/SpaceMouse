@@ -7,6 +7,8 @@ It writes to serial monitor:
 */
 
 #include "USBHost_t36.h"
+#include <Watchdog_t4.h>
+#include <imxrt.h>
 
 USBHost myusb;
 USBHub hub1(myusb);
@@ -28,33 +30,67 @@ const char *hid_driver_names[CNT_HIDDEVICES] = {"HID_SpaceMouse"};
 bool hid_driver_active[CNT_HIDDEVICES] = {false};
 bool show_changed_only = false;
 
-void blinkLed(float freq, float duty) {
+WDT_T4<WDT1> wdt;
+
+void blinkLed(float freq, float duty)
+{
     static unsigned long lastBlink = 0;
     static bool ledState = false;
     unsigned long now = millis();
     unsigned long onDuration = (unsigned long)(1000.0f * duty / freq);
     unsigned long offDuration = (unsigned long)(1000.0f * (1.0f - duty) / freq);
-    
-    if (ledState && (now - lastBlink >= onDuration)) {  // LED on for onDuration
+
+    if (ledState && (now - lastBlink >= onDuration))
+    { // LED on for onDuration
         digitalWrite(LED_BUILTIN, LOW);
         ledState = false;
         lastBlink = now;
-    } else if (!ledState && (now - lastBlink >= offDuration)) {  // LED off for offDuration
+    }
+    else if (!ledState && (now - lastBlink >= offDuration))
+    { // LED off for offDuration
         digitalWrite(LED_BUILTIN, HIGH);
         ledState = true;
         lastBlink = now;
     }
 }
 
-void setup()
+void printLastResetCause()
 {
-    myusb.begin();
-    Serial.begin(115200);
-    //while (!Serial) ; // wait until host opens serial monitor
-    Serial.println("\nSpaceMouse minimal working example");
-    pinMode(LED_BUILTIN, OUTPUT);
+    uint32_t cause = SRC_SRSR;
+    Serial.printf("Last reset cause: 0x%08X\n", cause);
+
+    if (cause & SRC_SRSR_IPP_RESET_B)
+        Serial.println("Power reset");
+    if (cause & SRC_SRSR_WDOG_RST_B)
+        Serial.println("Watchdog reset");
+    if (cause & SRC_SRSR_WDOG3_RST_B)
+        Serial.println("Watchdog3 reset");
+    if (cause & SRC_SRSR_JTAG_RST_B)
+        Serial.println("JTAG reset");
+    if (cause & SRC_SRSR_IPP_USER_RESET_B)
+        Serial.println("RESET pin");
 }
 
+void setup()
+{
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH);
+
+    Serial.begin(115200);
+    while (!Serial)
+        ; // wait until host opens serial monitor
+    Serial.println();
+    printLastResetCause();
+    myusb.begin();
+    Serial.println("SpaceMouse minimal working example");
+
+    // Configure watchdog to reset after 5 seconds if not fed
+    WDT_timings_t config;
+    config.trigger = 5;  // 5 seconds timeout
+    config.timeout = 10; // 10 seconds hard timeout
+    wdt.begin(config);
+    Serial.println("Watchdog enabled: 5 second timeout");
+}
 
 //=============================================================================
 // Show when devices are added or removed
@@ -118,6 +154,8 @@ void PrintDeviceListChanges()
 
 void loop()
 {
+    // Feed the watchdog to prevent reset
+    wdt.feed();
     myusb.Task();
     PrintDeviceListChanges();
 
@@ -125,9 +163,13 @@ void loop()
     {
         Serial.printf("SpaceMouse: %d %d %d %d %d %d buttons: %d\n", joystick.getAxis(0), joystick.getAxis(1), joystick.getAxis(2), joystick.getAxis(3), joystick.getAxis(4), joystick.getAxis(5), joystick.getButtons());
         blinkLed(2, 0.9);
-    } else if (hub1){
+    }
+    else if (hub1)
+    {
         blinkLed(2, 0.5);
-    } else {
+    }
+    else
+    {
         blinkLed(2, 0.1);
     }
     delay(50);

@@ -5,9 +5,11 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <Watchdog_t4.h>
 #include "version.h"
 #include "UsbHost.hpp"
 
+WDT_T4<WDT1> wdt;
 
 const bool WAIT_FOR_HOST_SERIAL = false; // set true for debugging, false for production
 
@@ -45,6 +47,24 @@ void initLittleFS() {
     }
 }
 
+void wdtCallback() {
+    // This runs *before* reset (optional)
+    // You normally leave this empty
+}
+
+void myCallback() {
+    digitalWrite(LED_BUILTIN, HIGH); // Toggle built-in LED
+}
+
+void initWatchdog() {
+  WDT_timings_t config;
+  config.trigger = 2; /* in seconds, 0->128 */
+  config.timeout = 4; /* in seconds, 0->128, system will hard-reset */
+  config.callback = myCallback;
+  wdt.begin(config);    
+  wdt.callback(wdtCallback);
+}
+
 void sendWelcomeInfo() {
     Serial.println("[INFO] Welcome to SpaceMouse application!");
 
@@ -68,6 +88,7 @@ void setup() {
         }
     }
 
+    initWatchdog();
     initLittleFS();
     setupUsbHost();
 }
@@ -95,4 +116,5 @@ void loop()
     } else {
         blinkLed(1.0f, 0.05f); // 10% duty cycle if nothing is connected
     }
+    wdt.feed();
 }

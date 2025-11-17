@@ -306,5 +306,5 @@ void loop() {
         initInfoSent = false;
     }
     processSerial();
-    blinkLed(1.0f, 0.1f);  // Blink LED at 1Hz with 10% duty cycle
+    blinkLed(2.0f, 0.25f);  // Blink LED at 2Hz with 25% duty cycle
 }
