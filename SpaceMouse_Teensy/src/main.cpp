@@ -47,22 +47,10 @@ void initLittleFS() {
     }
 }
 
-void wdtCallback() {
-    // This runs *before* reset (optional)
-    // You normally leave this empty
-}
-
-void myCallback() {
-    digitalWrite(LED_BUILTIN, HIGH); // Toggle built-in LED
-}
-
 void initWatchdog() {
   WDT_timings_t config;
-  config.trigger = 2; /* in seconds, 0->128 */
-  config.timeout = 4; /* in seconds, 0->128, system will hard-reset */
-  config.callback = myCallback;
+  config.timeout = 4;
   wdt.begin(config);    
-  wdt.callback(wdtCallback);
 }
 
 void sendWelcomeInfo() {

@@ -1,3 +1,5 @@
+<!--- In Visual Studio Code, press Crtl-Shift-V to preview. -->
+
 # PC - Teensy - SpaceMouse full application
 
 A script for Teensy 4.1 to communicate with SpaceMouse and USB serial devices, with support for USB hubs. Comes with an extensive GUI for the host PC to examine status, adjust settings, etc.
@@ -12,7 +14,7 @@ A script for Teensy 4.1 to communicate with SpaceMouse and USB serial devices, w
 
 - 1 Hz, 5%: nothing connected
 - 1 Hz, 25%: only usbserial connected
-- 1 Hz, 40%: only SpaceMouse connected
+- 1 Hz, 50%: only SpaceMouse connected
 - 2 Hz, 90%: both SpaceMouse and usbserial connected
 
 ## Troubleshooting
@@ -26,3 +28,6 @@ Find the line with this message in `.platformio\packages\framework-arduinoteensy
 ### Python: package serial not found
 In a terminal or PowerShell, run the following command:
 - pip install pyserial pyqt6
+
+## Teensy crashes when Pico is plugged in USB hub
+This is a known issue. One specific hub is known to work, so try using a different hub etc.

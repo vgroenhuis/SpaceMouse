@@ -86,10 +86,10 @@ void setup()
 
     // Configure watchdog to reset after 5 seconds if not fed
     WDT_timings_t config;
-    config.trigger = 5;  // 5 seconds timeout
-    config.timeout = 10; // 10 seconds hard timeout
+    //config.trigger = 2;
+    config.timeout = 4;
     wdt.begin(config);
-    Serial.println("Watchdog enabled: 5 second timeout");
+    Serial.println("Watchdog enabled: 4 second timeout");
 }
 
 //=============================================================================
@@ -156,6 +156,7 @@ void loop()
 {
     // Feed the watchdog to prevent reset
     wdt.feed();
+
     myusb.Task();
     PrintDeviceListChanges();
 
