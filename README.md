@@ -58,4 +58,7 @@ In a terminal or PowerShell, run the following command:
 - pip install pyserial pyqt6
 
 ## Teensy crashes when Pico is plugged in USB hub
-This is a known issue. One specific hub is known to work, so try using a different hub etc.
+This was a known issue and should have been fixed now. Make sure to use the latest version of USBHost_t36 (from github). See [this forum post](https://forum.pjrc.com/index.php?threads/connecting-pico-to-teensy-4-1-usb-host-through-usb-hub-crashes-except-for-one-specific-hub-and-certain-ports.77469) for more details.
+
+
+

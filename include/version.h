@@ -1,5 +1,5 @@
 #define FW_MAJOR 1
 #define FW_MINOR 1
-#define FW_PATCH 0
-#define FW_BUILD 8
-#define FW_VERSION_STRING "1.1.0.8"
+#define FW_PATCH 1
+#define FW_BUILD 10
+#define FW_VERSION_STRING "1.1.1.10"
