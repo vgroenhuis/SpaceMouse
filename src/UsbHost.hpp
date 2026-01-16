@@ -9,15 +9,6 @@
 // Define global storage for robot joints
 int g_robot_joints[8] = {0,0,0,0,0,0,0,0};
 
-// Forward declaration
-void sendJson(JsonDocument &doc) {
-    if (Serial) {
-        String out;
-        serializeJson(doc, out);
-        Serial.println(out);   // newline-delimited JSON
-    }
-}
-
 USBHost myusb;
 USBHub hub1(myusb);
 USBHub hub2(myusb);
@@ -37,6 +28,21 @@ const char *hid_driver_names[CNT_HIDDEVICES] = {"HID_SpaceMouse"};
 bool hid_driver_active[CNT_HIDDEVICES] = {false};
 bool show_changed_only = false;
 
+void sendJsonToHost(JsonDocument &doc) {
+    if (Serial) {
+        String out;
+        serializeJson(doc, out);
+        Serial.println(out);
+    }
+}
+
+void sendJsonToClient(JsonDocument &doc) {
+    if (userial && userial.availableForWrite()) {
+        String out;
+        serializeJson(doc, out);
+        userial.println(out);
+    }
+}
 
 bool spaceMouseConnected() {
     return joystick;
@@ -47,8 +53,8 @@ bool usbSerialConnected() {
 }
 
 // Dominant axis detection parameters
-static const int DOMINANT_DEADZONE = 200; // Minimum absolute axis value to consider active
-static const uint32_t DOMINANT_REPORT_INTERVAL_MS = 100; // 10 Hz like other reports
+static const int DOMINANT_DEADZONE = 150; // Minimum absolute axis value to consider active
+static const uint32_t DOMINANT_REPORT_INTERVAL_MS = 100;
 
 // Track last reported axis/direction to suppress redundant messages
 static int last_dominant_axis_index = -1; // -1 means none
@@ -83,11 +89,13 @@ void printDeviceListChanges()
                 Serial.printf("[INFO] Device %s disconnected\n", driver_names[i]);
                 driver_active[i] = false;
 
+
+
                 if (drivers[i] == &userial) {
                     // Send JSON status update
                     JsonDocument doc;
                     doc["usbserial_connected"] = false;
-                    sendJson(doc);
+                    sendJsonToHost(doc);
                     // Reset connection time
                     usbserial_connected_ms = 0;
                 }
@@ -110,9 +118,10 @@ void printDeviceListChanges()
 
                 if (drivers[i] == &userial) {
                     // Send JSON status update
+                    userial.begin(115200);
                     JsonDocument doc;
                     doc["usbserial_connected"] = true;
-                    sendJson(doc);
+                    sendJsonToHost(doc);
                     // Record connection time
                     usbserial_connected_ms = millis();
                 }
@@ -133,7 +142,7 @@ void printDeviceListChanges()
                     // Send JSON status update
                     JsonDocument doc;
                     doc["spacemouse_connected"] = false;
-                    sendJson(doc);
+                    sendJsonToHost(doc);
                 }
             }
             else
@@ -156,18 +165,18 @@ void printDeviceListChanges()
                     // Send JSON status update
                     JsonDocument doc;
                     doc["spacemouse_connected"] = true;
-                    sendJson(doc);
+                    sendJsonToHost(doc);
                 }
             }
         }
     }
 }
 
-void sendRawJoystickDataToHost() {
+void sendRawJoystickData() {
     // Send SpaceMouse state at 10 Hz when connected
     static uint32_t last_report_ms = 0;
     uint32_t now = millis();
-    if (joystick && (now - last_report_ms >= 100)) {
+    if (joystick && (now - last_report_ms >= 100)) { // 1 Hz
         last_report_ms = now;
 
         JsonDocument doc;
@@ -181,16 +190,22 @@ void sendRawJoystickDataToHost() {
         rxyz.add(joystick.getAxis(4)); // RY
         rxyz.add(joystick.getAxis(5)); // RZ
         doc["sm_buttons"] = joystick.getButtons();
-        sendJson(doc);
+        sendJsonToHost(doc);
+        sendJsonToClient(doc);
     }
 }
 
-void detectDominantAxis() {
-    if (!spaceMouseConnected()) return;
+void detectSendDominantAxis() {
+    static int qSent = 0;
+    if (!spaceMouseConnected()) {
+        return;
+    }
 
     static uint32_t last_ms = 0;
     uint32_t now = millis();
-    if (now - last_ms < DOMINANT_REPORT_INTERVAL_MS) return;
+    if (now - last_ms < DOMINANT_REPORT_INTERVAL_MS) {
+        return;
+    }
     last_ms = now;
 
     // Read 6 axes: X,Y,Z,RX,RY,RZ
@@ -208,8 +223,6 @@ void detectDominantAxis() {
         }
     }
 
-
-
     int direction = 0; // -1 backward, +1 forward
     if (dominant_index >= 0) {
         direction = (axes[dominant_index] > 0) ? 1 : -1;
@@ -217,7 +230,18 @@ void detectDominantAxis() {
 
     // Only send if changed OR active axis present (periodic refresh while active)
     bool changed = (dominant_index != last_dominant_axis_index) || (direction != last_dominant_direction);
-    if (!changed) return; // && dominant_index < 0) return; // nothing active and no change
+    if (!changed) {
+        // we send the Q command several times to be sure it is processed
+        if (dominant_index < 0) {
+            qSent++;
+            if (qSent >= 5) {
+                return;
+            }
+        } else {
+            qSent = 0;
+            return;
+        }
+    }
 
     last_dominant_axis_index = dominant_index;
     last_dominant_direction = direction;
@@ -229,22 +253,22 @@ void detectDominantAxis() {
 
     if (joystick.getButtons() == 0) {
         if (dominant_index == 0) { // X
-            targetJoints[0] += direction * 10000;
+            targetJoints[0] += direction * 2000;
         } else if (dominant_index == 5) { // RZ
-            targetJoints[1] -= direction * 10000;
+            targetJoints[1] -= direction * 2000;
         } else if (dominant_index == 2) { // Z
-            targetJoints[2] -= direction * 10000;
-            targetJoints[3] -= direction * 10000;
+            targetJoints[2] -= direction * 2000;
+            targetJoints[3] -= direction * 2000;
         } else if (dominant_index == 3) { // RX
-            targetJoints[2] += direction * 10000;
-            targetJoints[3] -= direction * 10000;
+            targetJoints[2] += direction * 2000;
+            targetJoints[3] -= direction * 2000;
         }
     } else {
         // needle forward/backward control
         if (dominant_index == 1) { // Y
-            targetJoints[4] -= direction * 10000;
+            targetJoints[4] -= direction * 2000;
         } else if (dominant_index == 3) { // RX
-            targetJoints[4] -= direction * 10000;
+            targetJoints[4] -= direction * 2000;
         }
     }
 
@@ -255,19 +279,26 @@ void detectDominantAxis() {
         for (int i = 0; i < 8; i++) {
             setpoint_array.add(targetJoints[i]);
         }
-        sendJson(setpointDoc);
+        sendJsonToHost(setpointDoc);
     }
 
     if (userial) {
-        char cmd[64];
-        snprintf(cmd, sizeof(cmd), "A%d B%d C%d D%d E%d F%d G%d H%d",
-                 targetJoints[0], targetJoints[1], targetJoints[2], targetJoints[3],
-                 targetJoints[4], targetJoints[5], targetJoints[6], targetJoints[7]);
-        userial.printf("%s\n",cmd);
+        if (dominant_index < 0) {
+            userial.println("Q"); // brake command
+            JsonDocument txDoc;
+            txDoc["usbserial_tx"] = "Q";
+            sendJsonToHost(txDoc);
+        } else {
+            char cmd[64];
+            snprintf(cmd, sizeof(cmd), "A%d B%d C%d D%d E%d F%d G%d H%d",
+                    targetJoints[0], targetJoints[1], targetJoints[2], targetJoints[3],
+                    targetJoints[4], targetJoints[5], targetJoints[6], targetJoints[7]);
+            userial.printf("%s\n",cmd);
 
-        JsonDocument txDoc;
-        txDoc["usbserial_tx"] = cmd; // command content without newline
-        sendJson(txDoc);
+            JsonDocument txDoc;
+            txDoc["usbserial_tx"] = cmd; // command content without newline
+            sendJsonToHost(txDoc);
+        }
     }
 
     JsonDocument doc;
@@ -281,7 +312,7 @@ void detectDominantAxis() {
         doc["dominant_axis"] = "none";
         doc["dominant_direction"] = 0;                        // none
     }
-    sendJson(doc);
+    sendJsonToHost(doc);
 }
 
 void processUsbSerialInput() {
@@ -322,7 +353,7 @@ void processUsbSerialInput() {
                                 for (int i = 0; i < 8; i++) {
                                     joints_array.add(joints[i]);
                                 }
-                                sendJson(doc);
+                                sendJsonToHost(doc);
 
                                 // Store latest joints into global variable
                                 for (int i = 0; i < 8; i++) {
@@ -336,14 +367,14 @@ void processUsbSerialInput() {
                                 if (raw_line.length() > 0) {
                                     JsonDocument rawDoc;
                                     rawDoc["usbserial_data"] = raw_line;
-                                    sendJson(rawDoc);
+                                    sendJsonToHost(rawDoc);
                                 }
                             }
                         } else {
                             // Not robot joints, forward as regular serial data
                             JsonDocument doc;
                             doc["usbserial_data"] = usbserial_line_buffer;
-                            sendJson(doc);
+                            sendJsonToHost(doc);
                         }
                         
                         usbserial_line_buffer = "";
@@ -364,16 +395,18 @@ void periodicRequestSyncRobotPosition()
         return; // Wait for 2 seconds after connection
     }
 
-    // Send periodic command "P" at 50 Hz
+    // Send periodic command "P"
     static uint32_t last_cmd_ms = 0;
-    if (now - last_cmd_ms >= 20) { // 50 Hz
+    if (now - last_cmd_ms >= 100) { // request position
         last_cmd_ms = now;
-        userial.println("P");
-        // Also inform PC host what we transmitted to USB serial
-        {
-            JsonDocument txDoc;
-            txDoc["usbserial_tx"] = "P"; // command content without newline
-            sendJson(txDoc);
+        if (userial.availableForWrite()) {
+            userial.println("P");
+            // Also inform PC host what we transmitted to USB serial
+            {
+                JsonDocument txDoc;
+                txDoc["usbserial_tx"] = "P"; // command content without newline
+                sendJsonToHost(txDoc);
+            }
         }
     }
 }
@@ -382,8 +415,8 @@ void usbHostLoop()
 {
     myusb.Task();
     printDeviceListChanges();
-    sendRawJoystickDataToHost();
-    detectDominantAxis();
+    sendRawJoystickData();
+    detectSendDominantAxis();
 
     // Read and forward USB Serial data to PC host
     if (userial) {

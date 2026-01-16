@@ -62,13 +62,13 @@ void sendWelcomeInfo() {
     doc["device"] = "teensy41";
     doc["spacemouse_connected"] = spaceMouseConnected();
     doc["usbserial_connected"] = usbSerialConnected();
-    sendJson(doc);
+    sendJsonToHost(doc);
 }
 
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
 
-    Serial.begin(115200);
+    Serial.begin(115200); // PC-Teensy
 
     if (WAIT_FOR_HOST_SERIAL) {
         while (!Serial) {

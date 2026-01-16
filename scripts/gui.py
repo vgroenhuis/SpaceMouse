@@ -131,6 +131,7 @@ class MainWindow(QWidget):
         self.ser = None
         self.reader_thread = None
         self.show_json = True
+        self.show_non_json = False
         self.show_position_updates = False  # Default: hide position updates
         
         self.fw_version = "Unknown"
@@ -284,10 +285,14 @@ class MainWindow(QWidget):
         self.show_json_chk = QCheckBox("Show JSON")
         self.show_json_chk.setChecked(False)
         self.show_json_chk.toggled.connect(lambda v: setattr(self, "show_json", v))
+        self.show_non_json_chk = QCheckBox("Show non-JSON")
+        self.show_non_json_chk.setChecked(False)
+        self.show_non_json_chk.toggled.connect(lambda v: setattr(self, "show_non_json", v))
         
         pc_teensy_layout.addWidget(self.pc_teensy_log)
         controls_row = QHBoxLayout()
         controls_row.addWidget(self.show_json_chk)
+        controls_row.addWidget(self.show_non_json_chk)
         controls_row.addStretch(1)
         controls_row.addWidget(clear_pc_btn)
         pc_teensy_layout.addLayout(controls_row)
@@ -409,6 +414,10 @@ class MainWindow(QWidget):
             is_system: True for system status messages (white background, italic, left-aligned)
         """
         if is_json and not self.show_json:
+            return
+
+        # Only log non-JSON messages coming from the Teensy if explicitly enabled.
+        if from_teensy and (not is_json) and (not is_system) and (not self.show_non_json):
             return
         
         cursor = self.pc_teensy_log.textCursor()
