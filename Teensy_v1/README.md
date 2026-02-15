@@ -1,6 +1,8 @@
 <!--- In Visual Studio Code, press Crtl-Shift-V to preview. -->
 
-# SpaceMouse application for Teensy 4.1
+# SpaceMouse application for Teensy 4.1 version 1.0.0
+
+(This is not the latest version, as there is 2.0.0 now)
 
 To connect a SpaceMouse input device to a Mamri controller (v3 with Arduino Due, or v5 with Pico 2), an intermediate controller is required as neither the Due nor Pico offer USB host capabilities. A Teensy 4.1 can act as USB host and therefore read out the SpaceMouse state, which is processed and sent to the Mamri through an USB-serial interface.
 
