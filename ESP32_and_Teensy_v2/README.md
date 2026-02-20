@@ -15,10 +15,7 @@ Both USB-C ports have CC1 and CC2 connected to GND through 5.1K resistors, confi
 Powerbank applies 5V at VBUS.
 Diode D2 or D3 forwards 5V minus one diode drop (around 0.5V) to VCC_5V, so around 4.5V.
 4.5V is provided through ESP32's 5V pin, to Teensy 4.1.
-
-# Rails
-
-Both left and right rails on breadboard provide 3.3V, to avoid accidental mix-up of 5V and 3.3V power.
+Breadboard: left rail: 5V; right rail: not used.
 
 # Pin assignment
 
