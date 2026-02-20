@@ -88,6 +88,7 @@ The embedded page in `include/pose3d.html.h`:
 - Renders a simple wireframe cube and axes on a `<canvas>`
 - Uses `x/y/z` as translation and `rx/ry/rz` as rotation for the pose visualization
 - Uses SpaceMouse axis convention in the view (`+x` right, `+y` down, `+z` right-hand rule)
+- Supports mouse-drag camera rotation with a world-axis table grid and labeled cube faces
 
 ---
 

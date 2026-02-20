@@ -1,5 +1,8 @@
 {
   "files.associations": {
-    "*.html.h": "html"
-  }
+    "*.html.h": "html",
+    "*.css.h": "css",
+    "*.js.h": "javascript"
+  },
+  "css.validate": false
 }

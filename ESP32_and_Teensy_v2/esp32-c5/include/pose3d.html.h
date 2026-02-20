@@ -10,7 +10,7 @@ const char pose3d_html[] = R"rawliteral(
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <div class="container">
+    <div class="container pose-container">
         <h1>3D Pose Visualization</h1>
         <div class="nav">
             <a href="/">Home</a>
@@ -21,18 +21,12 @@ const char pose3d_html[] = R"rawliteral(
 
         <div id="status" class="status disconnected">Status: Disconnected</div>
 
-        <div class="row">
-            <div class="panel">
-                <canvas id="poseCanvas" width="600" height="420"></canvas>
-            </div>
-            <div class="panel">
-                <div class="values" id="values">
-                    T: (0, 0, 0)<br>
-                    R: (0, 0, 0)<br>
-                    Buttons: 0
-                </div>
-            </div>
+        <div class="values pose-values" id="values">
+            T: (0, 0, 0)<br>
+            R: (0, 0, 0)<br>
+            Buttons: 0
         </div>
+        <canvas id="poseCanvas" class="pose-canvas" width="800" height="600"></canvas>
     </div>
 
     <script>
@@ -42,6 +36,13 @@ const char pose3d_html[] = R"rawliteral(
 
         var canvas = document.getElementById('poseCanvas');
         var ctx = canvas.getContext('2d');
+
+        // Camera rotation
+        var cameraRotX = -1.2;
+        var cameraRotY = 0;
+        var mouseDown = false;
+        var lastMouseX = 0;
+        var lastMouseY = 0;
 
         function clamp(v, min, max) {
             return Math.min(max, Math.max(min, v));
@@ -76,7 +77,7 @@ const char pose3d_html[] = R"rawliteral(
         function project(p) {
             var cameraZ = 4.0;
             var z = p.z + cameraZ;
-            var f = 220 / z;
+            var f = 440 / z;
             return {
                 x: canvas.width * 0.5 + p.x * f,
                 y: canvas.height * 0.5 + p.y * f
@@ -97,6 +98,13 @@ const char pose3d_html[] = R"rawliteral(
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            // Apply camera rotation
+            var ccx = Math.cos(cameraRotX), scx = Math.sin(cameraRotX);
+            var ccy = Math.cos(cameraRotY), scy = Math.sin(cameraRotY);
+            var camRotX = [1,0,0, 0,ccx,-scx, 0,scx,ccx];
+            var camRotY = [ccy,0,scy, 0,1,0, -scy,0,ccy];
+            var camRot = matMul(camRotY, camRotX);
+
             var rx = toRad(latest.rx);
             var ry = toRad(latest.ry);
             var rz = toRad(latest.rz);
@@ -108,7 +116,7 @@ const char pose3d_html[] = R"rawliteral(
             var rotX = [1,0,0, 0,cx,-sx, 0,sx,cx];
             var rotY = [cy,0,sy, 0,1,0, -sy,0,cy];
             var rotZ = [cz,-sz,0, sz,cz,0, 0,0,1];
-            var rot = matMul(rotZ, matMul(rotY, rotX));
+            var spaceMouseRot = matMul(rotZ, matMul(rotY, rotX));
 
             var tx = clamp(latest.x / 350, -1, 1) * 1.2;
             var ty = clamp(latest.y / 350, -1, 1) * 1.2;
@@ -116,9 +124,30 @@ const char pose3d_html[] = R"rawliteral(
 
             var origin = { x: tx, y: ty, z: tz };
 
-            drawLine3D({x: -1.8, y: 0, z: 0}, {x: 1.8, y: 0, z: 0}, '#dd4444', 1);
-            drawLine3D({x: 0, y: -1.8, z: 0}, {x: 0, y: 1.8, z: 0}, '#44aa44', 1);
-            drawLine3D({x: 0, y: 0, z: -1.8}, {x: 0, y: 0, z: 1.8}, '#4477dd', 1);
+            // Draw world axes with camera rotation
+            var xAxisStart = rotatePoint({x: -1.8, y: 0, z: 0}, camRot);
+            var xAxisEnd = rotatePoint({x: 1.8, y: 0, z: 0}, camRot);
+            var yAxisStart = rotatePoint({x: 0, y: -1.8, z: 0}, camRot);
+            var yAxisEnd = rotatePoint({x: 0, y: 1.8, z: 0}, camRot);
+            var zAxisStart = rotatePoint({x: 0, y: 0, z: -1.8}, camRot);
+            var zAxisEnd = rotatePoint({x: 0, y: 0, z: 1.8}, camRot);
+            
+            drawLine3D(xAxisStart, xAxisEnd, '#dd4444', 1);
+            drawLine3D(yAxisStart, yAxisEnd, '#44aa44', 1);
+            drawLine3D(zAxisStart, zAxisEnd, '#4477dd', 1);
+
+            // Draw table surface (XY plane at Z=0)
+            var gridSize = 1.8;
+            var gridStep = 0.3;
+            for (var i = -gridSize; i <= gridSize; i += gridStep) {
+                var p1 = rotatePoint({x: i, y: -gridSize, z: 0}, camRot);
+                var p2 = rotatePoint({x: i, y: gridSize, z: 0}, camRot);
+                drawLine3D(p1, p2, '#cccccc', 1);
+                
+                var p3 = rotatePoint({x: -gridSize, y: i, z: 0}, camRot);
+                var p4 = rotatePoint({x: gridSize, y: i, z: 0}, camRot);
+                drawLine3D(p3, p4, '#cccccc', 1);
+            }
 
             var cube = [
                 {x:-0.5,y:-0.5,z:-0.5}, {x:0.5,y:-0.5,z:-0.5},
@@ -127,9 +156,11 @@ const char pose3d_html[] = R"rawliteral(
                 {x:0.5,y:0.5,z:0.5}, {x:-0.5,y:0.5,z:0.5}
             ];
 
+            // Apply spacemouse rotation, then translate in world space, then camera rotation
             for (var i = 0; i < cube.length; i++) {
-                var p = rotatePoint(cube[i], rot);
-                cube[i] = { x: p.x + origin.x, y: p.y + origin.y, z: p.z + origin.z };
+                var p = rotatePoint(cube[i], spaceMouseRot);
+                p = { x: p.x + origin.x, y: p.y + origin.y, z: p.z + origin.z };
+                cube[i] = rotatePoint(p, camRot);
             }
 
             var edges = [
@@ -141,12 +172,52 @@ const char pose3d_html[] = R"rawliteral(
                 drawLine3D(cube[edges[e][0]], cube[edges[e][1]], '#222', 2);
             }
 
-            var xAxis = rotatePoint({x:0.9,y:0,z:0}, rot);
-            var yAxis = rotatePoint({x:0,y:0.9,z:0}, rot);
-            var zAxis = rotatePoint({x:0,y:0,z:0.9}, rot);
-            drawLine3D(origin, {x: origin.x + xAxis.x, y: origin.y + xAxis.y, z: origin.z + xAxis.z}, '#dd4444', 3);
-            drawLine3D(origin, {x: origin.x + yAxis.x, y: origin.y + yAxis.y, z: origin.z + yAxis.z}, '#44aa44', 3);
-            drawLine3D(origin, {x: origin.x + zAxis.x, y: origin.y + zAxis.y, z: origin.z + zAxis.z}, '#4477dd', 3);
+            // Label cube surfaces (top, right, front)
+            // Top surface (z=-0.5): center of vertices 0,1,2,3
+            var topCenter = {
+                x: (cube[0].x + cube[1].x + cube[2].x + cube[3].x) / 4,
+                y: (cube[0].y + cube[1].y + cube[2].y + cube[3].y) / 4,
+                z: (cube[0].z + cube[1].z + cube[2].z + cube[3].z) / 4
+            };
+            // Right surface (x=0.5): center of vertices 1,2,6,5
+            var rightCenter = {
+                x: (cube[1].x + cube[2].x + cube[6].x + cube[5].x) / 4,
+                y: (cube[1].y + cube[2].y + cube[6].y + cube[5].y) / 4,
+                z: (cube[1].z + cube[2].z + cube[6].z + cube[5].z) / 4
+            };
+            // Front surface (y=0.5): center of vertices 2,3,7,6
+            var frontCenter = {
+                x: (cube[2].x + cube[3].x + cube[7].x + cube[6].x) / 4,
+                y: (cube[2].y + cube[3].y + cube[7].y + cube[6].y) / 4,
+                z: (cube[2].z + cube[3].z + cube[7].z + cube[6].z) / 4
+            };
+            
+            // Draw labels
+            var topProj = project(topCenter);
+            var rightProj = project(rightCenter);
+            var frontProj = project(frontCenter);
+            
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#4477dd';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('TOP', topProj.x, topProj.y);
+            ctx.fillText('RIGHT', rightProj.x, rightProj.y);
+            ctx.fillText('FRONT', frontProj.x, frontProj.y);
+
+            // Draw local axes with proper transformation order
+            var xAxis = rotatePoint({x:0.9,y:0,z:0}, spaceMouseRot);
+            var yAxis = rotatePoint({x:0,y:0.9,z:0}, spaceMouseRot);
+            var zAxis = rotatePoint({x:0,y:0,z:0.9}, spaceMouseRot);
+            
+            var originCam = rotatePoint(origin, camRot);
+            var xAxisCam = rotatePoint({x: origin.x + xAxis.x, y: origin.y + xAxis.y, z: origin.z + xAxis.z}, camRot);
+            var yAxisCam = rotatePoint({x: origin.x + yAxis.x, y: origin.y + yAxis.y, z: origin.z + yAxis.z}, camRot);
+            var zAxisCam = rotatePoint({x: origin.x + zAxis.x, y: origin.y + zAxis.y, z: origin.z + zAxis.z}, camRot);
+            
+            drawLine3D(originCam, xAxisCam, '#dd4444', 3);
+            drawLine3D(originCam, yAxisCam, '#44aa44', 3);
+            drawLine3D(originCam, zAxisCam, '#4477dd', 3);
         }
 
         function updateText() {
@@ -181,6 +252,38 @@ const char pose3d_html[] = R"rawliteral(
                 latest = JSON.parse(event.data);
                 updateStatus();
                 updateText();
+        // Mouse controls for camera rotation
+        canvas.addEventListener('mousedown', function(e) {
+            mouseDown = true;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            if (mouseDown) {
+                var deltaX = e.clientX - lastMouseX;
+                var deltaY = e.clientY - lastMouseY;
+                
+                cameraRotY -= deltaX * 0.01;
+                cameraRotX += deltaY * 0.01;
+                
+                // Clamp X rotation to avoid flipping
+                cameraRotX = Math.max(-Math.PI, Math.min(Math.PI / 2, cameraRotX));
+                
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            mouseDown = false;
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            mouseDown = false;
+        });
+
                 draw();
             };
 

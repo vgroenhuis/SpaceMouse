@@ -18,6 +18,15 @@ body {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.pose-container {
+    max-width: 800px;
+}
+
+.pose-container #status {
+    display: block;
+    width: 100%;
+}
+
 h1 {
     margin: 0 0 12px 0;
     color: #333;
@@ -178,12 +187,22 @@ canvas {
     background-color: #fbfbfb;
 }
 
+.pose-canvas {
+    display: block;
+    max-width: 100%;
+}
+
 .values {
     line-height: 1.6;
     background: #f7f7f7;
     border: 1px solid #eee;
     border-radius: 6px;
     padding: 12px;
+}
+
+.pose-values {
+    display: inline-block;
+    margin-top: 15px;
 }
 
 @media (max-width: 900px) {
