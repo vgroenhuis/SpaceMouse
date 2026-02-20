@@ -1,5 +1,8 @@
 #include "web.h"
 #include "index.html.h"
+#include "basic.html.h"
+#include "pose3d.html.h"
+#include "styles.css.h"
 #include "teensy.h"
 #include <ArduinoJson.h>
 
@@ -40,14 +43,33 @@ void broadcastSpaceMouseData() {
     ws.textAll(jsonString);
 }
 
-void handleRoot(AsyncWebServerRequest *request) {
-    String html = index_html;
+String htmlWithAuth(const char* htmlTemplate) {
+    String html = htmlTemplate;
     if (adminCredentials.first == "" || adminCredentials.second == "") {
         html.replace("$AUTH_INFO$", "");
     } else {
-        html.replace("$AUTH_INFO$", "(user: " + adminCredentials.first + ", pass: " + (showPasswordOnRootPage?adminCredentials.second:"****") + ")");
+        html.replace("$AUTH_INFO$", "(user: " + adminCredentials.first + ", pass: " + (showPasswordOnRootPage ? adminCredentials.second : "****") + ")");
     }
+    return html;
+}
+
+void handleRoot(AsyncWebServerRequest *request) {
+    String html = htmlWithAuth(index_html);
     request->send(200, "text/html", html);
+}
+
+void handleBasic(AsyncWebServerRequest *request) {
+    String html = htmlWithAuth(basic_html);
+    request->send(200, "text/html", html);
+}
+
+void handle3d(AsyncWebServerRequest *request) {
+    String html = htmlWithAuth(pose3d_html);
+    request->send(200, "text/html", html);
+}
+
+void handleStyles(AsyncWebServerRequest *request) {
+    request->send(200, "text/css", styles_css);
 }
 
 void setupWeb() {
@@ -61,7 +83,17 @@ void setupWeb() {
     manager.server.addHandler(&ws);
     manager.server.on("/", [] (AsyncWebServerRequest *request) {
         handleRoot(request);
-    });    
+    });
+    manager.server.on("/basic", HTTP_GET, [] (AsyncWebServerRequest *request) {
+        handleBasic(request);
+    });
+    manager.server.on("/3d", HTTP_GET, [] (AsyncWebServerRequest *request) {
+        handle3d(request);
+    });
+    manager.server.on("/styles.css", HTTP_GET, [] (AsyncWebServerRequest *request) {
+        handleStyles(request);
+    });
+
     Serial.println("Roaming Wifi tester: Setup completed.");
 }
 

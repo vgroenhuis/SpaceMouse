@@ -5,7 +5,6 @@
 #if __has_include("../../../../VincentLibraryTester/include/VincentCredentials.h")
     #include "../../../../VincentLibraryTester/include/VincentCredentials.h"
 #else
-    #error "Wrong credentials path!"
     #define WIFI_CREDENTIALS {{"ssid","pass"},{"iotroam","pass2"}}
     #define ADMIN_CREDENTIALS {"",""}
     #define ALIAS_URL ""
