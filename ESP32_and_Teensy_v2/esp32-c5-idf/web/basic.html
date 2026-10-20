@@ -101,7 +101,7 @@
             ws.onopen = function() {
                 ws.send('stream');   // the device starts streaming when it hears from the page
                 console.log('WebSocket connected');
-                clearInterval(reconnectInterval);
+                clearTimeout(reconnectInterval);
             };
             
             ws.onmessage = function(event) {
@@ -151,7 +151,8 @@
             
             ws.onclose = function() {
                 console.log('WebSocket disconnected');
-                reconnectInterval = setInterval(connect, 2000);
+                clearTimeout(reconnectInterval);
+                reconnectInterval = setTimeout(connect, 2000);   // one retry per close (an interval kept opening sockets)
             };
             
             ws.onerror = function(error) {
