@@ -1,0 +1,32 @@
+menu "SpaceMouse"
+    config SPACEMOUSE_TEENSY_TX_GPIO
+        int "UART TX to the Teensy (its Serial1 RX, pin 0)"
+        default 2
+    config SPACEMOUSE_TEENSY_RX_GPIO
+        int "UART RX from the Teensy (its Serial1 TX, pin 1)"
+        default 3
+    config SPACEMOUSE_TEENSY_BAUD
+        int "UART baud rate (the Teensy's Serial1)"
+        default 921600
+    config SPACEMOUSE_OLED_CLK_GPIO
+        int "OLED (SSD1306, SPI) D0 / CLK GPIO"
+        default 0
+    config SPACEMOUSE_OLED_MOSI_GPIO
+        int "OLED D1 / MOSI GPIO"
+        default 1
+    config SPACEMOUSE_OLED_RES_GPIO
+        int "OLED RES GPIO"
+        default 6
+    config SPACEMOUSE_OLED_DC_GPIO
+        int "OLED DC GPIO"
+        default 7
+    config SPACEMOUSE_OLED_CS_GPIO
+        int "OLED CS GPIO"
+        default 8
+    config SPACEMOUSE_LED_GPIO
+        int "RGB status LED (WS2812) GPIO, -1: none"
+        default 27
+    config SPACEMOUSE_LED_RED_GREEN_REVERSED
+        bool "Red and green swapped on this LED (the Waveshare ESP32-C5 board)"
+        default y
+endmenu

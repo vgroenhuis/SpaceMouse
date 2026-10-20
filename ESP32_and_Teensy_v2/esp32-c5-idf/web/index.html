@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceMouse</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>SpaceMouse</h1>
+        <p>A 3Dconnexion SpaceMouse on a Teensy 4.1 (USB host) and an ESP32-C5 (Wi-Fi): six axes and the buttons, live.</p>
+        <div class="nav">
+            <a href="basic">Basic dashboard</a>
+            <a href="3d">3D pose</a>
+        </div>
+        <h2>Status</h2>
+        <p id="state">Loading...</p>
+        <h2>Data</h2>
+        <ul>
+            <li><a href="data">data</a>: the current values as JSON (state 0 no Teensy, 1 no SpaceMouse, 2 connected;
+                x, y, z, rx, ry, rz; buttons as a bit field)</li>
+            <li><code>ws</code>: the same values pushed 50 times a second over a WebSocket (send any message to start)</li>
+            <li><a href="api/state">api/state</a>: firmware, Teensy link, Wi-Fi</li>
+        </ul>
+        <p>
+            <a href="https://closer.ram.eemcs.utwente.nl/labdemos/demo?id=spacemouse" target="_blank" rel="noopener">Lab demos page</a> ·
+            <a href="https://github.com/vgroenhuis/SpaceMouse" target="_blank" rel="noopener">GitHub</a>
+        </p>
+    </div>
+    <script>
+        const STATES = ['no Teensy (check the serial wires and its power)', 'Teensy ok, no SpaceMouse (plug it into the Teensy)', 'connected'];
+        async function refresh() {
+            try {
+                const s = await (await fetch('api/state')).json();
+                document.getElementById('state').textContent =
+                    `SpaceMouse: ${STATES[s.state]} · firmware ${s.fw} · Wi-Fi ${s.rssi} dBm` +
+                    (s.messages_per_s != null ? ` · ${s.messages_per_s} messages/s from the Teensy` : '');
+            } catch (e) {
+                document.getElementById('state').textContent = 'The device does not answer.';
+            }
+        }
+        refresh();
+        setInterval(refresh, 3000);
+    </script>
+</body>
+</html>
