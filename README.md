@@ -16,8 +16,9 @@ the SpaceMouse and reads its six axes and buttons.
 ## History
 
 Thijs Vissers made the initial application in 2024 for his BSc AT (Advanced Technology) graduation project: the first
-Teensy 4.1 program for the SpaceMouse. In 2025 the software and hardware were redesigned (Teensy_v1), and in 2026 the Wi-Fi
-version with the ESP32-C5 was added (ESP32_and_Teensy_v2). Thanks to Thijs for starting this project.
+Teensy 4.1 program for the SpaceMouse. Vincent Groenhuis then redesigned the system: the software and hardware in 2025
+(Teensy_v1), and in 2026 made it portable and wireless, with an ESP32-C5 on Wi-Fi and a power bank (ESP32_and_Teensy_v2).
+Thanks to Thijs for starting this project.
 
 ## Licence
 
