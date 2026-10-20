@@ -1,18 +1,33 @@
+/* Colours follow the system's light or dark theme. */
+:root {
+    color-scheme: light dark;
+    --bg: #f0f0f0; --card: #fff; --text: #333; --muted: #666; --tile: #f5f5f5; --track: #ddd; --line: #ddd;
+    --canvas: #fbfbfb; --shadow: rgba(0, 0, 0, 0.1);
+    --grid: #cccccc; --edge: #222222; --label: #4477dd;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #121418; --card: #1c2027; --text: #e3e6eb; --muted: #9aa3ae; --tile: #252b34; --track: #333b46; --line: #343c48;
+        --canvas: #161a20; --shadow: rgba(0, 0, 0, 0.5);
+        --grid: #3a4250; --edge: #e8ebf0; --label: #7fa8ff;
+    }
+}
+
 body {
     margin: 0;
     padding: 20px;
     font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
-    color: #333;
+    background-color: var(--bg);
+    color: var(--text);
 }
 
 .container {
     max-width: 960px;
     margin: 0 auto;
-    background-color: #fff;
+    background-color: var(--card);
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px var(--shadow);
 }
 
 .pose-container {
@@ -26,13 +41,13 @@ body {
 
 h1 {
     margin: 0 0 12px 0;
-    color: #333;
+    color: var(--text);
 }
 
 h2 {
     margin-top: 20px;
     margin-bottom: 10px;
-    color: #333;
+    color: var(--text);
 }
 
 p {
@@ -62,7 +77,7 @@ p {
 
 .auth-info {
     align-self: center;
-    color: #666;
+    color: var(--muted);
     font-size: 0.9em;
 }
 
@@ -97,14 +112,14 @@ p {
 }
 
 .data-item {
-    background-color: #f5f5f5;
+    background-color: var(--tile);
     padding: 15px;
     border-radius: 4px;
 }
 
 .data-label {
     font-weight: bold;
-    color: #666;
+    color: var(--muted);
     font-size: 0.9em;
     margin-bottom: 5px;
 }
@@ -116,7 +131,7 @@ p {
 
 .data-value {
     font-size: 1.2em;
-    color: #333;
+    color: var(--text);
 }
 
 .button-indicator {
@@ -127,8 +142,8 @@ p {
     text-align: center;
     margin: 5px;
     border-radius: 4px;
-    background-color: #ddd;
-    color: #666;
+    background-color: var(--track);
+    color: var(--muted);
 }
 
 .button-indicator.pressed {
@@ -139,7 +154,7 @@ p {
 .slider-container {
     width: 100%;
     height: 20px;
-    background-color: #ddd;
+    background-color: var(--track);
     border-radius: 10px;
     position: relative;
     margin-top: 10px;
@@ -161,7 +176,7 @@ p {
     top: 0;
     bottom: 0;
     width: 2px;
-    background-color: #666;
+    background-color: var(--muted);
     transform: translateX(-1px);
 }
 
@@ -179,9 +194,9 @@ canvas {
     width: 100%;
     max-width: 600px;
     height: auto;
-    border: 1px solid #ddd;
+    border: 1px solid var(--line);
     border-radius: 6px;
-    background-color: #fbfbfb;
+    background-color: var(--canvas);
 }
 
 .pose-canvas {
@@ -191,8 +206,8 @@ canvas {
 
 .values {
     line-height: 1.6;
-    background: #f7f7f7;
-    border: 1px solid #eee;
+    background: var(--tile);
+    border: 1px solid var(--line);
     border-radius: 6px;
     padding: 12px;
 }

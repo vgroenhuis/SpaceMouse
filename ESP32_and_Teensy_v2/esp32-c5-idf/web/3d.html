@@ -26,6 +26,10 @@
 
     <script>
         var ws;
+        // The grid, cube and labels take their colours from styles.css (light or dark, as the system).
+        function cssColor(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
         var reconnectInterval;
         var latest = { state: 0, x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, buttons: 0 };
 
@@ -137,11 +141,11 @@
             for (var i = -gridSize; i <= gridSize; i += gridStep) {
                 var p1 = rotatePoint({x: i, y: -gridSize, z: 0}, camRot);
                 var p2 = rotatePoint({x: i, y: gridSize, z: 0}, camRot);
-                drawLine3D(p1, p2, '#cccccc', 1);
+                drawLine3D(p1, p2, cssColor('--grid'), 1);
                 
                 var p3 = rotatePoint({x: -gridSize, y: i, z: 0}, camRot);
                 var p4 = rotatePoint({x: gridSize, y: i, z: 0}, camRot);
-                drawLine3D(p3, p4, '#cccccc', 1);
+                drawLine3D(p3, p4, cssColor('--grid'), 1);
             }
 
             var cube = [
@@ -164,7 +168,7 @@
                 [0,4],[1,5],[2,6],[3,7]
             ];
             for (var e = 0; e < edges.length; e++) {
-                drawLine3D(cube[edges[e][0]], cube[edges[e][1]], '#222', 2);
+                drawLine3D(cube[edges[e][0]], cube[edges[e][1]], cssColor('--edge'), 2);
             }
 
             // Label cube surfaces (top, right, front)
@@ -193,7 +197,7 @@
             var frontProj = project(frontCenter);
             
             ctx.font = 'bold 14px Arial';
-            ctx.fillStyle = '#4477dd';
+            ctx.fillStyle = cssColor('--label');
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('TOP', topProj.x, topProj.y);
