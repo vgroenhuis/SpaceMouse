@@ -22,7 +22,7 @@ Pins (menuconfig > SpaceMouse): Teensy UART TX=2, RX=3 at 921600 baud; OLED D0/C
 
 ## Build
 
-    . $IDF_PATH/export.sh            # ESP-IDF 5.5
+    . $IDF_PATH/export.sh            # ESP-IDF 6.1 (5.5 builds too)
     idf.py build
 
 ## First flash (USB)
